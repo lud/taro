@@ -1,0 +1,4 @@
+%{
+  "gherkin": {:git, "https://github.com/cabbage-ex/gherkin.git", "4d0ac255006bdf67181fcf2c83a6d85a9f323d5e", [branch: "master"]},
+  "plain_fsm": {:git, "https://github.com/cabbage-ex/gherkin.git", "4d0ac255006bdf67181fcf2c83a6d85a9f323d5e", [branch: "master"]},
+}
