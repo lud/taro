@@ -1,11 +1,26 @@
 defmodule Taro.Context.Compiler do
-
-  @todo "Supervision"
-
   # Matches words starting with a ":" at the beginning of a string
   # or not preceded with a word
   @re_tpl ~r/(?<!\w)(\:\w+)\b/
   @re_captures ~r/\((?!=[?!=])/
+
+  alias Taro.Context.Handler
+
+  def extract_steps_handlers(modules) when is_list(modules) do
+    modules
+    |> Enum.map(&extract_steps_handlers/1)
+    |> List.flatten()
+  end
+
+  def extract_steps_handlers(mod) when is_atom(mod) do
+    Code.ensure_loaded(mod)
+
+    if function_exported?(mod, :__taro_steps__, 0) do
+      mod.__taro_steps__()
+    else
+      []
+    end
+  end
 
   def install do
     quote do
@@ -15,88 +30,122 @@ defmodule Taro.Context.Compiler do
       Module.register_attribute(__MODULE__, :taro_steps, [])
       @taro_steps []
 
-      # @todo def set_context(data) -> merge data
-      # def put_context(context, key, value),
-      #   do: put_context(context, __MODULE__, key, value)
-      # def get_context(context, key),
-      #   do: get_context(context, __MODULE__, key)
-      # def put_context(context, mod, key, value),
-      #   do: put_in(context, [mod, key], value)
-      # def get_context(context, mod, key),
-      #   do: get_in(context, [mod, key])
+      def put_context(context, key, value),
+        do: Taro.Context.put(context, __MODULE__, key, value)
 
+      def get_context(context, key),
+        do: Taro.Context.get(context, __MODULE__, key)
+
+      def merge(context, map) when is_map(map),
+        do: Taro.Context.merge(context, __MODULE__, map)
     end
   end
 
   defmacro before_compile(env) do
     module = env.module
-    steps_defs = module
+
+    steps_defs =
+      module
       |> Module.get_attribute(:taro_steps)
       |> Enum.map(fn {pattern, {fun, args}} ->
-          defined_arity = length(args)
-          original_pattern = pattern
-          pattern = convert_tpl_matchers(pattern)
-          regex = Regex.compile!(pattern)
-          captures_count = count_captures(regex)
-          expected_arity = captures_count + 1 # accept the context state
-          if (expected_arity != defined_arity) do
-            raise "The function #{module |> format_module}.#{fun}(#{format_args(args)}) defined after \"#{original_pattern}\" must accept #{expected_arity} arguments, #{defined_arity} arguments found"
+        # @todo defined functions can be below, with shorter artity
+        # functions for default args, so use @todo use Module.defines?
+        defined_arity = length(args)
+        original_pattern = pattern
+        pattern = convert_tpl_matchers(pattern)
+        regex = Regex.compile!(pattern)
+        captures_count = count_captures(regex)
+        # accept the context state
+        expected_arity = captures_count + 1
+
+        # If the expected arity differs from the function defined 
+        # after a step, it could be because the user set defaults
+        # args like : def there_is_coffees(count \\ 0, context).
+        # so we check if the function has been defined esewhere
+        if expected_arity != defined_arity do
+          IO.warn("""
+          The function #{module |> format_module}.#{fun}(#{format_args(args)}) 
+          defined after \"#{original_pattern}\" should accept #{expected_arity} arguments, 
+          #{defined_arity} arguments found
+          """)
+
+          if not Module.defines?(module, {fun, expected_arity}, :def) do
+            raise """
+            The function #{module |> format_module}.#{fun}(#{format_args(args)}) 
+            defined after \"#{original_pattern}\" must accept #{expected_arity} arguments, 
+            #{defined_arity} arguments found
+            """
           end
-          Macro.escape(%{
-            stepdef: original_pattern,
-            pattern: pattern,
-            regex: regex,
-            fun: {module, fun, expected_arity},
-          })
-         end)
+        end
+
+        Macro.escape(%Handler{
+          stepdef: original_pattern,
+          pattern: pattern,
+          regex: regex,
+          fun: {module, fun}
+        })
+      end)
+
     quote do
       def __taro_steps__() do
         unquote(steps_defs)
       end
+
+      def setup(),
+        do: {:ok, %{}}
+
+      defoverridable setup: 0
     end
   end
 
   @doc """
   Replaces ":vars in pattern" to "(.+) in pattern"
   """
-  defp convert_tpl_matchers(pattern) do
+  def convert_tpl_matchers(pattern) do
     Regex.replace(@re_tpl, pattern, "(.+)")
-    |> IO.inspect(pretty: true, label: :replaced)
   end
 
   defp count_captures(regex) do
-    pattern = regex
+    pattern =
+      regex
       |> Regex.source()
       |> Regex.escape()
+
     Regex.scan(@re_captures, pattern)
-    |> IO.inspect(pretty: true)
     |> length
   end
 
-  def on_def(env, kind, :__taro_steps__, args, guards, body),
+  def on_def(_env, _kind, :__taro_steps__, _args, _guards, _body),
     do: :ok
-  def on_def(env, kind, fun_name, args, guards, body) do
+
+  def on_def(env, :def, fun_name, args, _guards, _body) do
     module = env.module
-    IO.puts("Defining #{kind} fun_named #{fun_name} on #{module} with args:")
-    IO.inspect(args, label: "args")
-    new_steps = module
+    IO.puts("defining #{module} #{fun_name}/#{length(args)}")
+
+    new_steps =
+      module
       |> Module.get_attribute(:step)
       |> Enum.map(fn pattern -> {pattern, {fun_name, args}} end)
+
     previous_steps = Module.get_attribute(module, :taro_steps)
     all_steps = new_steps ++ previous_steps
     Module.put_attribute(module, :taro_steps, all_steps)
     # clear the steps for the next functions
     Module.delete_attribute(module, :step)
-    IO.inspect(all_steps)
   end
+
+  def on_def(_env, _kind, _fun, _args, _guards, _body),
+    do: :ok
 
   defp format_module(mod) when is_atom(mod),
     do: format_module(to_string(mod))
+
   defp format_module("Elixir." <> mod),
     do: mod
+
   defp format_module(mod),
     do: mod
 
-  defp format_args(args), 
+  defp format_args(args),
     do: args |> Enum.map(&Macro.to_string/1) |> Enum.join(", ")
 end

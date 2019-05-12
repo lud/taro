@@ -8,7 +8,8 @@ defmodule Taro.MixProject do
       elixir: "~> 1.8",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers ++ [:features],
+      #  ++ [:features],
+      compilers: Mix.compilers()
     ]
   end
 
@@ -25,8 +26,9 @@ defmodule Taro.MixProject do
     [
       # {:dep_from_hexpm, "~> 0.3.0"},
       {:gherkin, github: "cabbage-ex/gherkin", branch: "master"},
+      {:ark, "~> 0.1.0"},
+      {:slugger, "~> 0.3.0"}
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
   end
-
 end

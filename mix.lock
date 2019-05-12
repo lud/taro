@@ -1,4 +1,6 @@
 %{
+  "ark": {:hex, :ark, "0.1.0", "e800649847b2840950d56331bcf46038bb4d0b7e0b9e26e580ebaf7213f3d9d4", [:mix], [], "hexpm"},
   "gherkin": {:git, "https://github.com/cabbage-ex/gherkin.git", "4d0ac255006bdf67181fcf2c83a6d85a9f323d5e", [branch: "master"]},
   "plain_fsm": {:git, "https://github.com/cabbage-ex/gherkin.git", "4d0ac255006bdf67181fcf2c83a6d85a9f323d5e", [branch: "master"]},
+  "slugger": {:hex, :slugger, "0.3.0", "efc667ab99eee19a48913ccf3d038b1fb9f165fa4fbf093be898b8099e61b6ed", [:mix], [], "hexpm"},
 }
