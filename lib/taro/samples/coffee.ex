@@ -72,7 +72,7 @@ defmodule Taro.Samples.Coffee do
       context
       |> get_context(:machine)
       |> CoffeeMachine.take_coffee()
-    
+    assert 0 = machine.served
     merge(context, %{machine: machine})
   end
 end

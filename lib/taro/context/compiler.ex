@@ -28,6 +28,7 @@ defmodule Taro.Context.Compiler do
       @before_compile {unquote(__MODULE__), :before_compile}
       Module.register_attribute(__MODULE__, :step, accumulate: true)
       Module.register_attribute(__MODULE__, :taro_steps, [])
+      import ExUnit.Assertions
       @taro_steps []
 
       def put_context(context, key, value),
