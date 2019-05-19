@@ -3,7 +3,7 @@ defmodule TaroTest do
   doctest Taro
 
   test "greets the world" do
-    Taro.Samples.Decom.__taro_steps__()
+    Taro.Samples.Coffee.__taro_steps__()
     |> IO.inspect(pretty: true)
   end
 end

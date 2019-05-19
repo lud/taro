@@ -30,5 +30,6 @@ use Mix.Config
 #     import_config "#{Mix.env()}.exs"
 config :taro,
   contexts: [
-    Taro.Samples.Coffee
+    Taro.Samples.Coffee,
+    Taro.Samples.Metafeature,
   ]

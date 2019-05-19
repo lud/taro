@@ -8,7 +8,7 @@ defmodule Taro.MixProject do
       elixir: "~> 1.8",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      #  ++ [:features],
+      # elixirc_paths: elixirc_paths(Mix.env()),
       compilers: Mix.compilers()
     ]
   end
@@ -31,4 +31,7 @@ defmodule Taro.MixProject do
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
   end
+
+  # defp elixirc_paths(:test), do: ["lib", "features"]
+  # defp elixirc_paths(_), do: ["lib", "features"]
 end

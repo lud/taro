@@ -30,6 +30,7 @@ defmodule CoffeeMachine do
 
   def take_coffee(%__MODULE__{served: 1} = machine),
     do: %__MODULE__{machine | served: 0}
+
   def take_coffee(%__MODULE__{served: 0}),
     do: raise("There is no coffee served")
 end
@@ -37,10 +38,16 @@ end
 defmodule Taro.Samples.Coffee do
   use Taro.Context
 
+  @step "there is a coffee machine"
+  def there_is_a_coffee_machine(context) do
+    merge(context, %{machine: CoffeeMachine.new()})
+  end
+
   @step "there are :count coffees left in the machine"
   def there_are_n_coffees_left_in_the_machine(n, context) do
     machine =
-      CoffeeMachine.new()
+      context
+      |> get_context(:machine)
       |> CoffeeMachine.set_coffees(n)
 
     merge(context, %{machine: machine})
@@ -72,7 +79,8 @@ defmodule Taro.Samples.Coffee do
       context
       |> get_context(:machine)
       |> CoffeeMachine.take_coffee()
+
     assert 0 = machine.served
-    merge(context, %{machine: machine})
+    :ok
   end
 end

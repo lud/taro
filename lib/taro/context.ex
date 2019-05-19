@@ -12,7 +12,7 @@ defmodule Taro.Context do
   end
 
   @behaviour Access
-  defstruct state: %{}
+  defstruct state: %{}, feature_module: nil
   defdelegate fetch(map, key), to: Map
   defdelegate get_and_update(map, key, fun), to: Map
   defdelegate pop(map, key), to: Map
@@ -25,13 +25,13 @@ defmodule Taro.Context do
   We will build a map where each passed module is a key and the
   value is the result of module.setup()
   """
-  def new(modules) do
+  def new(modules, meta) do
     mod_states =
       modules
       |> Enum.map(&{&1, init_context_module(&1)})
       |> Enum.into(%{})
 
-    %__MODULE__{state: mod_states}
+    %__MODULE__{state: mod_states, feature_module: meta[:feature_module]}
   end
 
   def put(%__MODULE__{} = context, mod, value),
@@ -76,6 +76,12 @@ defmodule Taro.Context do
     %Handler{fun: {mod, fun}, captures: captures} = handler
 
     case apply(mod, fun, captures ++ [context]) do
+      nil ->
+        {:ok, context}
+      
+      :ok ->
+        {:ok, context}
+
       {:ok, %__MODULE__{} = context} ->
         {:ok, context}
 
@@ -87,7 +93,8 @@ defmodule Taro.Context do
 
       other ->
         raise """
-        A context function must always return {:ok, context} or {:error, reason},
+        A context function must always return :ok | nil to keep the current context,
+        {:ok, context} to return a new context or {:error, reason}
         #{mod}.#{fun} returned : #{inspect(other)}
         """
     end
