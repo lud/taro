@@ -92,7 +92,7 @@ defmodule Taro.Context do
         err
 
       other ->
-        raise """
+        raise Taro.Exception.BadContextReturn, message: """
         A context function must always return :ok | nil to keep the current context,
         {:ok, context} to return a new context or {:error, reason}
         #{mod}.#{fun} returned : #{inspect(other)}
@@ -100,6 +100,8 @@ defmodule Taro.Context do
     end
   rescue
     e in Taro.Exception.Pending -> :pending
-    e -> {:error, {:exception, e}}
+    e in Taro.Exception.BadContextReturn -> 
+      reraise e, __STACKTRACE__
+    e -> {:error, {:exception, e, __STACKTRACE__}}
   end
 end

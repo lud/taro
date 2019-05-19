@@ -51,10 +51,17 @@ defmodule Taro.FeatureCase do
     handlers = Compiler.extract_steps_handlers(contexts_mods)
     context = Context.new(contexts_mods, feature_module: feature_module)
     IO.puts "Using contexts\n\t#{contexts_mods |> Enum.join("\n\t")}"
-    scenario
+    results = scenario
     |> Map.get(:steps)
     |> match_steps(handlers)
     |> Enum.scan({:ok, context}, &run_step/2)
+    results
+    |> Enum.each(fn 
+      {:error, {:exception, e, stack}} ->
+        reraise e, stack # Make ExUnit fail
+      _ -> 
+        :ok
+    end)
   end
 
   defp match_steps(steps, handlers) do
@@ -106,6 +113,9 @@ defmodule Taro.FeatureCase do
 
   defp format_call_result({:ok, context}) do
     [IO.ANSI.light_green(), "OK", IO.ANSI.reset()]
+  end
+  defp format_call_result({:error, {:exception, e, stack}}) do
+    [IO.ANSI.light_red(), "Exception: #{inspect e.message}", IO.ANSI.reset()]
   end
   defp format_call_result({:error, reason}) do
     [IO.ANSI.light_red(), "Error: #{inspect reason}", IO.ANSI.reset()]
