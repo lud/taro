@@ -31,5 +31,5 @@ use Mix.Config
 config :taro,
   contexts: [
     Taro.Samples.Coffee,
-    Taro.Samples.Metafeature,
+    Taro.Samples.Metafeature
   ]

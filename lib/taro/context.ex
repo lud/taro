@@ -74,34 +74,56 @@ defmodule Taro.Context do
 
   def call(context, handler) do
     %Handler{fun: {mod, fun}, captures: captures} = handler
-
-    case apply(mod, fun, captures ++ [context]) do
-      nil ->
-        {:ok, context}
-      
-      :ok ->
-        {:ok, context}
-
+    args = [context|captures]
+    arity = length(args)
+    case apply(mod, fun, args) do
       {:ok, %__MODULE__{} = context} ->
         {:ok, context}
 
       %__MODULE__{} = context ->
         {:ok, context}
 
+      # Returning {:ok, not_a_context} or :error without reason
+      # is forbidden
+      {:ok, other} ->
+        raise_bad_return(mod, fun, arity, {:ok, other})
+
+      :error ->
+        raise_bad_return(mod, fun, arity, :error)
+
       {:error, _} = err ->
         err
 
       other ->
-        raise Taro.Exception.BadContextReturn, message: """
-        A context function must always return :ok | nil to keep the current context,
-        {:ok, context} to return a new context or {:error, reason}
-        #{mod}.#{fun} returned : #{inspect(other)}
-        """
+        # anything else is accepted and will be ignored
+        {:ok, context}
     end
   rescue
-    e in Taro.Exception.Pending -> :pending
-    e in Taro.Exception.BadContextReturn -> 
+    e in Taro.Exception.Pending ->
+      :pending
+
+    e in Taro.Exception.BadContextReturn ->
       reraise e, __STACKTRACE__
-    e -> {:error, {:exception, e, __STACKTRACE__}}
+
+    e ->
+      {:error, {:exception, e, __STACKTRACE__}}
+  end
+
+  defp raise_bad_return(mod, fun, arity, data) do
+    raise Taro.Exception.BadContextReturn,
+      message: """
+      Bad return value from context !
+      Module: #{mod}
+      Function: #{fun}/#{arity}
+      Returned value: #{inspect(data)}
+      Forbidden return values from context:
+        - {:ok, data} where data is not a context
+        - :error without a reason
+      Accepted values:
+        - {:ok, %Taro.Context{}} (context will be updated)
+        - %Taro.Context{}        (context will be updated)
+        - anything else except the forbidden values. In this case, 
+          the returned value will be discarded
+      """
   end
 end

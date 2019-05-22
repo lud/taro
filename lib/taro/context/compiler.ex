@@ -54,6 +54,8 @@ defmodule Taro.Context.Compiler do
         defined_arity = length(args)
         original_pattern = pattern
         pattern = convert_tpl_matchers(pattern)
+        # make the pattern match the whole string
+        pattern = "^#{pattern}$"
         regex = Regex.compile!(pattern)
         captures_count = count_captures(regex)
         # accept the context state
