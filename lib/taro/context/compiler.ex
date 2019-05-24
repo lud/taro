@@ -39,6 +39,12 @@ defmodule Taro.Context.Compiler do
 
       def merge(context, map) when is_map(map),
         do: Taro.Context.merge(context, __MODULE__, map)
+
+      def merge(map) when is_map(map) do
+        # this is a shortcut. The context call() function will merge
+        # the map under the context-module key on the original context
+        {:merge, map}
+      end
     end
   end
 
@@ -123,7 +129,6 @@ defmodule Taro.Context.Compiler do
 
   def on_def(env, :def, fun_name, args, _guards, _body) do
     module = env.module
-    IO.puts("defining #{module} #{fun_name}/#{length(args)}")
 
     new_steps =
       module

@@ -16,17 +16,44 @@ defmodule Taro.FeatureCase do
     file_name = opts[:file]
     source = File.read!(file_name)
     # We use the parser directly in order to provide the file_name
-    ghdata = Gherkin.Parser.parse_feature(source, file_name)
-    %Feature{scenarios: scenarios, background_steps: background_steps} = ghdata
+    gherkin_tree = Gherkin.Parser.parse_feature(source, file_name)
+    %Feature{scenarios: scenarios, background_steps: background_steps} = gherkin_tree
 
+    quoted_scenario_setup = build_scenario_setup(background_steps)
     quoted_scenaro_tests = build_scenario_tests(scenarios)
 
-    quote do
+    quote location: :keep do
       use ExUnit.Case
 
-      def __feature__(), do: unquote(Macro.escape(ghdata))
+      def __feature__(), do: unquote(Macro.escape(gherkin_tree))
 
+      unquote(quoted_scenario_setup)
       unquote(quoted_scenaro_tests)
+    end
+  end
+
+  defp build_scenario_setup(background_steps) do
+    # We map on the :taro_test === true to run the setup.
+    # This prevents from running the setup for tests defined in
+    # The feature .exs file
+    quote location: :keep do
+      ExUnit.Callbacks.setup exunit_context do
+        case Map.fetch(exunit_context, :taro_test) do
+          {:ok, true} ->
+            contexts_mods = Application.get_env(:taro, :contexts)
+
+            context =
+              taro_context =
+              contexts_mods
+              |> Taro.Context.new()
+              |> Taro.FeatureCase.run_background(unquote(Macro.escape(background_steps)))
+
+            %{taro_context: taro_context}
+
+          _otherwise ->
+            :ok
+        end
+      end
     end
   end
 
@@ -36,22 +63,36 @@ defmodule Taro.FeatureCase do
   end
 
   defp build_scenario_test(scenario) do
-    quote do
-      test unquote(scenario.name) do
-        Taro.FeatureCase.run_scenario(unquote(Macro.escape(scenario)), __MODULE__)
+    quote location: :keep do
+      @tag taro_test: true
+      test unquote(scenario.name), %{taro_context: taro_context} do
+        Taro.FeatureCase.run_scenario(taro_context, unquote(Macro.escape(scenario)))
       end
     end
   end
 
-  def run_scenario(scenario, feature_module) do
+  def run_background(context, []) do
+    context
+  end
+
+  def run_background(context, steps) do
+    run_steps(context, steps)
+  end
+
+  def run_scenario(context, scenario) do
+    run_steps(context, scenario.steps)
+  end
+
+  def run_steps(context, steps) do
+    # If there was a Background in the feature, the setup will
+    # return {:ok, context} | :pending | {:error, …}
+    # so we unwrap a :ok tuple but keep other values as is
+    context = uok(context)
     contexts_mods = Application.get_env(:taro, :contexts)
     handlers = Compiler.extract_steps_handlers(contexts_mods)
-    context = Context.new(contexts_mods, feature_module: feature_module)
-    IO.puts("Using contexts\n\t#{contexts_mods |> Enum.join("\n\t")}")
 
     results =
-      scenario
-      |> Map.get(:steps)
+      steps
       |> match_steps(handlers)
       |> Enum.scan({:ok, context}, &run_step/2)
 
@@ -67,6 +108,8 @@ defmodule Taro.FeatureCase do
       _ ->
         :ok
     end)
+
+    List.last(results)
   end
 
   defp match_steps(steps, handlers) do

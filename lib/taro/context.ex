@@ -12,7 +12,7 @@ defmodule Taro.Context do
   end
 
   @behaviour Access
-  defstruct state: %{}, feature_module: nil
+  defstruct state: %{}
   defdelegate fetch(map, key), to: Map
   defdelegate get_and_update(map, key, fun), to: Map
   defdelegate pop(map, key), to: Map
@@ -25,13 +25,13 @@ defmodule Taro.Context do
   We will build a map where each passed module is a key and the
   value is the result of module.setup()
   """
-  def new(modules, meta) do
+  def new(modules) do
     mod_states =
       modules
       |> Enum.map(&{&1, init_context_module(&1)})
       |> Enum.into(%{})
 
-    %__MODULE__{state: mod_states, feature_module: meta[:feature_module]}
+    %__MODULE__{state: mod_states}
   end
 
   def put(%__MODULE__{} = context, mod, value),
@@ -46,9 +46,9 @@ defmodule Taro.Context do
   def get(%__MODULE__{} = context, mod, key),
     do: get_in(context, [:state, mod, key])
 
-  def merge(%__MODULE__{} = context, mod, value) do
+  def merge(%__MODULE__{} = context, mod, map) when is_map(map) do
     current = get(context, mod)
-    merged = Map.merge(current, value)
+    merged = Map.merge(current, map)
     put(context, mod, merged)
   end
 
@@ -74,19 +74,27 @@ defmodule Taro.Context do
 
   def call(context, handler) do
     %Handler{fun: {mod, fun}, captures: captures} = handler
-    args = [context|captures]
+    args = [context | captures]
     arity = length(args)
+
     case apply(mod, fun, args) do
+
+      {:merge, map} when is_map(map) ->
+        context = merge(context, mod, map)
+        {:ok, context}
+
       {:ok, %__MODULE__{} = context} ->
         {:ok, context}
 
       %__MODULE__{} = context ->
         {:ok, context}
 
-      # Returning {:ok, not_a_context} or :error without reason
-      # is forbidden
-      {:ok, other} ->
-        raise_bad_return(mod, fun, arity, {:ok, other})
+      # Returning {:ok, not_a_context}, :error without reason or
+      # {:merge, not_a_map} is forbidden
+      {:merge, _} = other ->
+        raise_bad_return(mod, fun, arity, other)
+      {:ok, _} = other ->
+        raise_bad_return(mod, fun, arity, other)
 
       :error ->
         raise_bad_return(mod, fun, arity, :error)
@@ -95,7 +103,7 @@ defmodule Taro.Context do
         err
 
       other ->
-        # anything else is accepted and will be ignored
+        # anything else is accepted and will be discarded
         {:ok, context}
     end
   rescue
@@ -112,12 +120,13 @@ defmodule Taro.Context do
   defp raise_bad_return(mod, fun, arity, data) do
     raise Taro.Exception.BadContextReturn,
       message: """
-      Bad return value from context !
+      Bad return value from context.
       Module: #{mod}
       Function: #{fun}/#{arity}
       Returned value: #{inspect(data)}
       Forbidden return values from context:
         - {:ok, data} where data is not a context
+        - {:merge, value} where value is not a map
         - :error without a reason
       Accepted values:
         - {:ok, %Taro.Context{}} (context will be updated)

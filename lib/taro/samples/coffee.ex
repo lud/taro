@@ -40,27 +40,27 @@ defmodule Taro.Samples.Coffee do
 
   @step "there is a coffee machine"
   def there_is_a_coffee_machine(context) do
-    merge(context, %{machine: CoffeeMachine.new()})
+    merge(%{machine: CoffeeMachine.new()})
   end
 
   @step "there are :count coffees left in the machine"
-  def there_are_n_coffees_left_in_the_machine(n, context) do
+  def there_are_n_coffees_left_in_the_machine(context, n) do
     machine =
       context
       |> get_context(:machine)
       |> CoffeeMachine.set_coffees(n)
 
-    merge(context, %{machine: machine})
+    merge(%{machine: machine})
   end
 
   @step "I have deposited (\\d+) dollars?"
-  def i_have_deposited_n_dollars(dollars, context) do
+  def i_have_deposited_n_dollars(context, dollars) do
     machine =
       context
       |> get_context(:machine)
       |> CoffeeMachine.insert_dollars(dollars)
 
-    merge(context, %{machine: machine})
+    merge(%{machine: machine})
   end
 
   @step "I press the coffee button"
@@ -70,7 +70,7 @@ defmodule Taro.Samples.Coffee do
       |> get_context(:machine)
       |> CoffeeMachine.press_button()
 
-    merge(context, %{machine: machine})
+    merge(%{machine: machine})
   end
 
   @step "I should be served a coffee"
