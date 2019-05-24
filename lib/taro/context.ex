@@ -57,7 +57,7 @@ defmodule Taro.Context do
       data when is_map(data) ->
         data
 
-      {:ok, data} when is_map(data) ->
+      {:ok, data} ->
         data
 
       :ok ->
@@ -67,40 +67,34 @@ defmodule Taro.Context do
         raise """
         Could not initialize context #{mod}.
         The return value was : #{inspect(other)}
-        Expected a map or {:ok, map}
+        Expected a map or {:ok, any()}
         """
     end
   end
 
   def call(context, handler) do
     %Handler{fun: {mod, fun}, captures: captures} = handler
-    args = [context | captures]
+    sub_context = get(context, mod)
+    args = [sub_context | captures]
     arity = length(args)
 
     case apply(mod, fun, args) do
+      {:ok, sub_context_patch} ->
+        sub_context = mod.patch_context!(sub_context, sub_context_patch)
+        {:ok, put(context, mod, sub_context)}
 
-      {:merge, map} when is_map(map) ->
-        context = merge(context, mod, map)
+      sub_context_patch when is_map(sub_context_patch) ->
+        sub_context = mod.patch_context!(sub_context, sub_context_patch)
+        {:ok, put(context, mod, sub_context)}
+
+      :ok ->
         {:ok, context}
-
-      {:ok, %__MODULE__{} = context} ->
-        {:ok, context}
-
-      %__MODULE__{} = context ->
-        {:ok, context}
-
-      # Returning {:ok, not_a_context}, :error without reason or
-      # {:merge, not_a_map} is forbidden
-      {:merge, _} = other ->
-        raise_bad_return(mod, fun, arity, other)
-      {:ok, _} = other ->
-        raise_bad_return(mod, fun, arity, other)
-
-      :error ->
-        raise_bad_return(mod, fun, arity, :error)
 
       {:error, _} = err ->
         err
+
+      :error ->
+        raise_bad_return(mod, fun, arity, :error)
 
       other ->
         # anything else is accepted and will be discarded
@@ -114,7 +108,7 @@ defmodule Taro.Context do
       reraise e, __STACKTRACE__
 
     e ->
-      {:error, {:exception, e, __STACKTRACE__}}
+      {:error, {:exception, e, :__STACKTRACE__}}
   end
 
   defp raise_bad_return(mod, fun, arity, data) do
@@ -125,12 +119,12 @@ defmodule Taro.Context do
       Function: #{fun}/#{arity}
       Returned value: #{inspect(data)}
       Forbidden return values from context:
-        - {:ok, data} where data is not a context
-        - {:merge, value} where value is not a map
         - :error without a reason
       Accepted values:
-        - {:ok, %Taro.Context{}} (context will be updated)
-        - %Taro.Context{}        (context will be updated)
+        - {:ok, patch}         (will be merged in context)
+        - map when is_map(map) (will be merged in context)
+        - :ok        
+        - {:error, reason}
         - anything else except the forbidden values. In this case, 
           the returned value will be discarded
       """

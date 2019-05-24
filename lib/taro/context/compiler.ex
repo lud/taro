@@ -29,22 +29,30 @@ defmodule Taro.Context.Compiler do
       Module.register_attribute(__MODULE__, :step, accumulate: true)
       Module.register_attribute(__MODULE__, :taro_steps, [])
       import ExUnit.Assertions
+
       @taro_steps []
 
-      def put_context(context, key, value),
-        do: Taro.Context.put(context, __MODULE__, key, value)
+      def setup(),
+        do: {:ok, %{}}
 
-      def get_context(context, key),
-        do: Taro.Context.get(context, __MODULE__, key)
-
-      def merge(context, map) when is_map(map),
-        do: Taro.Context.merge(context, __MODULE__, map)
-
-      def merge(map) when is_map(map) do
-        # this is a shortcut. The context call() function will merge
-        # the map under the context-module key on the original context
-        {:merge, map}
+      def patch_context!(context, patch) when is_map(context) and is_map(patch) do
+        Map.merge(context, patch)
       end
+
+      def patch_context!(_, _) do
+        raise """
+        The default merge mechanism for contexts works only with maps.
+        If you need to use another data structure, you must implement
+        patch_context!/2 in module #{__MODULE__}.
+
+          def patch_context!(context, step_result) do
+            #
+          end
+        """
+      end
+
+      defoverridable setup: 0,
+                     patch_context!: 2
     end
   end
 
@@ -99,11 +107,6 @@ defmodule Taro.Context.Compiler do
       def __taro_steps__() do
         unquote(steps_defs)
       end
-
-      def setup(),
-        do: {:ok, %{}}
-
-      defoverridable setup: 0
     end
   end
 
