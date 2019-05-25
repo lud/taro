@@ -22,7 +22,7 @@ defmodule Taro.Context.Compiler do
     end
   end
 
-  def install do
+  def install(_opts) do
     quote do
       @on_definition {unquote(__MODULE__), :on_def}
       @before_compile {unquote(__MODULE__), :before_compile}
@@ -50,6 +50,9 @@ defmodule Taro.Context.Compiler do
           end
         """
       end
+
+      def transform!(value),
+        do: value
 
       defoverridable setup: 0,
                      patch_context!: 2

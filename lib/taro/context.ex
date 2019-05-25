@@ -17,8 +17,8 @@ defmodule Taro.Context do
   defdelegate get_and_update(map, key, fun), to: Map
   defdelegate pop(map, key), to: Map
 
-  defmacro __using__(_) do
-    Taro.Context.Compiler.install()
+  defmacro __using__(opts) do
+    Taro.Context.Compiler.install(opts)
   end
 
   @doc """
@@ -108,7 +108,7 @@ defmodule Taro.Context do
       reraise e, __STACKTRACE__
 
     e ->
-      {:error, {:exception, e, :__STACKTRACE__}}
+      {:error, {:exception, e, __STACKTRACE__}}
   end
 
   defp raise_bad_return(mod, fun, arity, data) do

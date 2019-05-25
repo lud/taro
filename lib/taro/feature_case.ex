@@ -161,8 +161,11 @@ defmodule Taro.FeatureCase do
       %{regex: regex} = handler
       # IO.puts "does #{inspect regex} match « #{text} » ?: #{Regex.match?(regex, text)}"
       case Regex.run(regex, text, capture: :all_but_first) do
-        nil -> nil
-        captures -> Handler.set_captures(handler, captures)
+        nil ->
+          nil
+
+        captures ->
+          Handler.set_captures(handler, captures)
       end
     end)
     |> case do
@@ -202,7 +205,7 @@ defmodule Taro.FeatureCase do
   @scenario_text_indent @scenario_indent <> "  "
   @step_indent "    "
   @error_indent @step_indent <> "  "
-  @step_io_indent @step_indent <> " ｜ "
+  @step_io_indent @step_indent <> " │ "
 
   def print_feature(%{name: name, description: description}) do
     # skip the ExUnit dot
@@ -246,7 +249,10 @@ defmodule Taro.FeatureCase do
     [
       @step_indent,
       step_print_color(result),
+      IO.ANSI.bright(),
       step.keyword,
+      IO.ANSI.reset(),
+      step_print_color(result),
       " ",
       step.text,
       step_print_extra(result),
@@ -269,7 +275,7 @@ defmodule Taro.FeatureCase do
 
   defp step_print_color(:pending), do: IO.ANSI.yellow()
 
-  defp step_print_color(:skipped), do: IO.ANSI.blue()
+  defp step_print_color(:skipped), do: IO.ANSI.cyan()
 
   defp step_print_extra({:ok, context}) do
     []
@@ -298,12 +304,7 @@ defmodule Taro.FeatureCase do
   end
 
   defp print_unmatched_step({:error, {:no_handler, step}}) do
-    [
-      IO.ANSI.red(),
-      "#{step.keyword} #{step.text} : No handler found",
-      IO.ANSI.reset()
-    ]
-    |> IO.puts()
+    print_step(step, {:error, "No handler found"}, "")
   end
 
   defp generate_snippet({:error, {:no_handler, step}}) do
