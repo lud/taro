@@ -8,14 +8,14 @@ defmodule Taro.Tokenizer.StepTokenizer do
   - ([0-9]) start a number, if a dot is encountered we match a float
   """
 
-  defguard is_num_char(digit) when digit >= ?0 and digit <= ?9
+  defguard is_digit(digit) when digit >= ?0 and digit <= ?9
   defguard is_whitespace(char) when char == ?\s or char == ?\t
 
   def tokenize(string) when is_binary(string) do
     string
     |> String.to_charlist()
     |> to_tokens()
-    |> cast_values()
+    |> cast_tokens()
   end
 
   defp to_tokens(input, acc \\ [])
@@ -30,7 +30,7 @@ defmodule Taro.Tokenizer.StepTokenizer do
     to_tokens(rest, [{:string, string} | tokens])
   end
 
-  defp to_tokens([num | rest], tokens) when is_num_char(num) do
+  defp to_tokens([num | rest], tokens) when is_digit(num) do
     {kind, value, rest} = parse_number_or_word([num | rest])
     to_tokens(rest, [{kind, value} | tokens])
   end
@@ -64,7 +64,7 @@ defmodule Taro.Tokenizer.StepTokenizer do
   defp parse_number_or_word(input, acc \\ [])
 
   # When finding digits, we try to parse an integer
-  defp parse_number_or_word([num | rest], acc) when is_num_char(num),
+  defp parse_number_or_word([num | rest], acc) when is_digit(num),
     do: parse_number_or_word(rest, [num | acc])
 
   # If we find a dot, we switch to a float
@@ -84,7 +84,7 @@ defmodule Taro.Tokenizer.StepTokenizer do
     do: parse_word(rest, acc)
 
   # We match digits and continue to build a float
-  defp parse_float_or_word([num | rest], acc) when is_num_char(num),
+  defp parse_float_or_word([num | rest], acc) when is_digit(num),
     do: parse_float_or_word(rest, [num | acc])
 
   # If we find whitespace, we return the float, space is discarded
@@ -115,18 +115,21 @@ defmodule Taro.Tokenizer.StepTokenizer do
 
   defdelegate reverse(val), to: :lists
 
-  defp cast_values([{:word, word} | rest]),
-    do: [{:word, to_string(word)} | cast_values(rest)]
+  defp cast_tokens([value | rest]),
+    do: [cast_token(value) | cast_tokens(rest)]
 
-  defp cast_values([{:string, string} | rest]),
-    do: [{:string, to_string(string)} | cast_values(rest)]
-
-  defp cast_values([{:integer, integer} | rest]),
-    do: [{:integer, {:erlang.list_to_integer(integer), to_string(integer)}} | cast_values(rest)]
-
-  defp cast_values([{:float, float} | rest]),
-    do: [{:float, {:erlang.list_to_float(float), to_string(float)}} | cast_values(rest)]
-
-  defp cast_values([]),
+  defp cast_tokens([]),
     do: []
+
+  defp cast_token({:word, word}),
+    do: {:word, to_string(word)}
+
+  defp cast_token({:string, string}),
+    do: {:string, to_string(string)}
+
+  defp cast_token({:integer, integer}),
+    do: {:integer, {:erlang.list_to_integer(integer), to_string(integer)}}
+
+  defp cast_token({:float, float}),
+    do: {:float, {:erlang.list_to_float(float), to_string(float)}}
 end
