@@ -55,6 +55,12 @@ defmodule Taro.Tokenizer.StepTokenizer do
   defp parse_string_expr([char | rest], acc, close_char),
     do: parse_string_expr(rest, [char | acc], close_char)
 
+  defp parse_string_expr([], acc, close_char),
+    do:
+      raise("""
+      Unterminated string expression started as #{<<close_char, to_string(reverse(acc))::binary>>}
+      """)
+
   defp parse_number_or_word(input, acc \\ [])
 
   # When finding digits, we try to parse an integer
@@ -116,10 +122,10 @@ defmodule Taro.Tokenizer.StepTokenizer do
     do: [{:string, to_string(string)} | cast_values(rest)]
 
   defp cast_values([{:integer, integer} | rest]),
-    do: [{:integer, :erlang.list_to_integer(integer)} | cast_values(rest)]
+    do: [{:integer, {:erlang.list_to_integer(integer), to_string(integer)}} | cast_values(rest)]
 
   defp cast_values([{:float, float} | rest]),
-    do: [{:float, :erlang.list_to_float(float)} | cast_values(rest)]
+    do: [{:float, {:erlang.list_to_float(float), to_string(float)}} | cast_values(rest)]
 
   defp cast_values([]),
     do: []
