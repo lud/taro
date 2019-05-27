@@ -3,58 +3,58 @@ defmodule StepActionMatchTest do
   alias Taro.Tokenizer.StepTokenizer
   alias Taro.Tokenizer.ActionTokenizer
 
-  def match_tokens(step, action_tokens) do
-    case action_tokens do
-      # A single regex
-      [{:regex, _} = re] -> do_match_regex(step.source, re)
-      tokens -> do_match(step.tokens, tokens)
-    end
+  def match_tokens(step, %Regex{} = re) do
+    do_match_regex(step.source, re)
   end
 
-  def do_match(step_tokens, action_tokens, acc \\ [])
+  def match_tokens(step, action_tokens) do
+    do_match(step.tokens, action_tokens)
+  end
 
-  def do_match([], [], acc),
+  defp do_match(step_tokens, action_tokens, acc \\ [])
+
+  defp do_match([], [], acc),
     do: {:ok, :lists.reverse(acc)}
 
   # Match the same word
-  def do_match([{:word, word} | step_rest], [{:word, word} | action_rest], acc),
+  defp do_match([{:word, word} | step_rest], [{:word, word} | action_rest], acc),
     do: do_match(step_rest, action_rest, acc)
 
   # Match a choice
-  def do_match([{:word, word} | step_rest], [{:word_choice, {word, _}} | action_rest], acc),
+  defp do_match([{:word, word} | step_rest], [{:word_choice, {word, _}} | action_rest], acc),
     do: do_match(step_rest, action_rest, acc)
 
-  def do_match([{:word, word} | step_rest], [{:word_choice, {_, word}} | action_rest], acc),
+  defp do_match([{:word, word} | step_rest], [{:word_choice, {_, word}} | action_rest], acc),
     do: do_match(step_rest, action_rest, acc)
 
-  def do_match([{:word, word} | step_rest], [{:word_choice, _} | action_rest], acc),
+  defp do_match([{:word, word} | step_rest], [{:word_choice, _} | action_rest], acc),
     do: {:error, :word_choice}
 
   # Match different words
-  def do_match([{:word, _wordA} | _], [{:word, _wordB} | _], _),
+  defp do_match([{:word, _wordA} | _], [{:word, _wordB} | _], _),
     do: {:error, :word}
 
   # Match a number as string
-  def do_match([{kind, {_, str}} | step_rest], [{:word, str} | action_rest], acc)
-      when kind in [:integer, :float],
-      do: do_match(step_rest, action_rest, acc)
+  defp do_match([{kind, {_, str}} | step_rest], [{:word, str} | action_rest], acc)
+       when kind in [:integer, :float],
+       do: do_match(step_rest, action_rest, acc)
 
-  def do_match([{kind, {_, _}} | step_rest], [{:word, _} | action_rest], acc)
-      when kind in [:integer, :float],
-      do: {:error, {kind, :word}}
+  defp do_match([{kind, {_, _}} | step_rest], [{:word, _} | action_rest], acc)
+       when kind in [:integer, :float],
+       do: {:error, {kind, :word}}
 
   # Accept values
 
-  def do_match([{kind, {value, _}} | step_rest], [{:accept, _} | action_rest], acc)
-      when kind in [:integer, :float],
-      do: do_match(step_rest, action_rest, [value | acc])
+  defp do_match([{kind, {value, _}} | step_rest], [{:accept, _} | action_rest], acc)
+       when kind in [:integer, :float],
+       do: do_match(step_rest, action_rest, [value | acc])
 
-  def do_match([{:string, value} | step_rest], [{:accept, _} | action_rest], acc),
+  defp do_match([{:string, value} | step_rest], [{:accept, _} | action_rest], acc),
     do: do_match(step_rest, action_rest, [value | acc])
 
   # Match a regex. This is a special case, as we must rewrite the input
 
-  def do_match_regex(step_source, {:regex, regex}) do
+  defp do_match_regex(step_source, regex) do
     case Regex.run(regex, step_source, capture: :all_but_first) do
       nil -> {:error, :regex}
       captures -> {:ok, captures}
@@ -126,6 +126,7 @@ defmodule StepActionMatchTest do
   end
 
   test "regular expressions match" do
-    assert_match("the price is 20", "/the price is (\\d+)/", ["20"])
+    assert_match("the price is 20", ~r/the price is (\d+)/, ["20"])
+    assert_not_match("the price is 20", ~r/the day is (\d+)/, :regex)
   end
 end

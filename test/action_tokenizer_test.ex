@@ -17,22 +17,6 @@ defmodule HandlerTokenizerTest do
     assert_tokenized("hé ho", word: "hé", word: "ho")
   end
 
-  test "tokenize a full regex" do
-    assert_tokenized("/hello i am a regex/", regex: ~r/hello i am a regex/)
-    assert_tokenized("/^hello i am a regex$/", regex: ~r/^hello i am a regex$/)
-
-    assert_tokenized("/hello i am a \\/ slash/", regex: Regex.compile!("hello i am a \\/ slash"))
-
-    assert_tokenized("/hello i contain a :colon/", regex: ~r/hello i contain a :colon/)
-
-    assert_tokenized("/hello i contain a ([0-9]+) capture/",
-      regex: ~r/hello i contain a ([0-9]+) capture/
-    )
-
-    assert_raise RuntimeError, fn -> tokenize("/unterminated regex") end
-    assert_raise Regex.CompileError, fn -> tokenize("/bad ( regex/") end
-  end
-
   test "tokenize word choices" do
     # Word choices
     assert_tokenized("Hello World/Universe", word: "Hello", word_choice: {"World", "Universe"})

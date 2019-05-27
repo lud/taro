@@ -4,7 +4,6 @@ defmodule Taro.Tokenizer.ActionTokenizer do
 
   We match on a limited set of characters:
 
-  - (/) matches a regex until (/) is encountered again
   - (:) matches a value acceptor until whitespace/end
   - (/) inside a word, followed by a word, matches a word choice
   """
@@ -26,12 +25,10 @@ defmodule Taro.Tokenizer.ActionTokenizer do
     |> cast_tokens()
   end
 
-  defp to_tokens(input, acc \\ [])
+  def tokenize(%Regex{} = regex),
+    do: regex
 
-  defp to_tokens([?/ | rest], tokens) do
-    {:regex, regex, rest} = parse_regex(rest)
-    to_tokens(rest, [{:regex, regex} | tokens])
-  end
+  defp to_tokens(input, acc \\ [])
 
   defp to_tokens([?: | rest], tokens) do
     {:accept, name, rest} = parse_accept(rest)
@@ -53,25 +50,6 @@ defmodule Taro.Tokenizer.ActionTokenizer do
 
   defp to_tokens([], tokens),
     do: reverse(tokens)
-
-  defp parse_regex(input, acc \\ [])
-
-  # When encountering a backslash, we keep it in the regex 
-  defp parse_regex([?\\, char | rest], acc),
-    do: parse_regex(rest, [char, ?\\ | acc])
-
-  defp parse_regex([?/ | rest], acc) do
-    {:regex, reverse(acc), rest}
-  end
-
-  defp parse_regex([char | rest], acc),
-    do: parse_regex(rest, [char | acc])
-
-  defp parse_regex([], acc),
-    do:
-      raise("""
-      Unterminated regular expression starting with #{acc |> reverse |> to_string()}
-      """)
 
   defp parse_word(input, acc \\ [])
 
@@ -143,10 +121,6 @@ defmodule Taro.Tokenizer.ActionTokenizer do
 
   defdelegate reverse(val), to: :lists
 
-  # Regex must be a single token in the list
-  defp cast_tokens([{:regex, regex}]),
-    do: [{:regex, Regex.compile!(to_string(regex))}]
-
   defp cast_tokens([value | rest]),
     do: [cast_token(value) | cast_tokens(rest)]
 
@@ -158,15 +132,6 @@ defmodule Taro.Tokenizer.ActionTokenizer do
 
   defp cast_token({:word_choice, {word_a, word_b}}),
     do: {:word_choice, {to_string(word_a), to_string(word_b)}}
-
-  defp cast_token({:regex, regex}),
-    do: {:regex, Regex.compile!(to_string(regex))}
-
-  defp cast_token({:regex, regex}),
-    do:
-      raise("""
-      A regex must be the full value of the action step definition
-      """)
 
   defp cast_token({:accept, name}),
     do: {:accept, Macro.underscore(to_string(name))}
