@@ -8,16 +8,16 @@ defmodule HandlerTokenizerTest do
     assert tokens === expected_tokens
   end
 
-  test "tokenize step defs" do
-    # Words
+  test "tokenize words" do
     assert_tokenized("E", word: "E")
     assert_tokenized("EA", word: "EA")
     assert_tokenized("héhéhé", word: "héhéhé")
     assert_tokenized("Hello World", word: "Hello", word: "World")
     assert_tokenized("I am a phrase", word: "I", word: "am", word: "a", word: "phrase")
     assert_tokenized("hé ho", word: "hé", word: "ho")
+  end
 
-    # full regex 
+  test "tokenize a full regex" do
     assert_tokenized("/hello i am a regex/", regex: ~r/hello i am a regex/)
     assert_tokenized("/^hello i am a regex$/", regex: ~r/^hello i am a regex$/)
 
@@ -31,7 +31,9 @@ defmodule HandlerTokenizerTest do
 
     assert_raise RuntimeError, fn -> tokenize("/unterminated regex") end
     assert_raise Regex.CompileError, fn -> tokenize("/bad ( regex/") end
+  end
 
+  test "tokenize word choices" do
     # Word choices
     assert_tokenized("Hello World/Universe", word: "Hello", word_choice: {"World", "Universe"})
     assert_raise RuntimeError, fn -> tokenize("a/b/") end
@@ -39,8 +41,9 @@ defmodule HandlerTokenizerTest do
     assert_raise RuntimeError, fn -> tokenize("a/b/c/") end
     assert_raise RuntimeError, fn -> tokenize("a//") end
     assert_raise RuntimeError, fn -> tokenize("a//b") end
+  end
 
-    # Values
+  test "tokenize accept values" do
     assert_tokenized("give me some :value",
       word: "give",
       word: "me",

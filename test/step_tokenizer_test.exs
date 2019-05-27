@@ -8,17 +8,16 @@ defmodule StepTokenizerTest do
     assert tokens === expected_tokens
   end
 
-  test "tokenize inputs" do
-    # simple tokens
+  test "tokenize words" do
     assert_tokenized("E", word: "E")
     assert_tokenized("EA", word: "EA")
     assert_tokenized("héhéhé", word: "héhéhé")
     assert_tokenized("Hello World", word: "Hello", word: "World")
     assert_tokenized("I am a phrase", word: "I", word: "am", word: "a", word: "phrase")
     assert_tokenized("hé ho", word: "hé", word: "ho")
+  end
 
-    # Quoted expressions (Strings)
-
+  test "tokenize quoted strings" do
     assert_tokenized("I am a 'quoted'", word: "I", word: "am", word: "a", string: "quoted")
 
     assert_tokenized("I am an 'escaped\\' quoted'",
@@ -49,8 +48,9 @@ defmodule StepTokenizerTest do
       word: "a",
       string: "double quoted whith whitespace"
     )
+  end
 
-    # Integers
+  test "tokenize integers" do
     assert_tokenized("1", integer: {1, "1"})
     assert_tokenized("a 1", word: "a", integer: {1, "1"})
     assert_tokenized("1 a", integer: {1, "1"}, word: "a")
@@ -62,9 +62,9 @@ defmodule StepTokenizerTest do
       word: "than",
       integer: {1, "1"}
     )
+  end
 
-    # Floats
-
+  test "tokenize floats" do
     assert_tokenized("1.0", float: {1.0, "1.0"})
     assert_tokenized("123.0", float: {123.0, "123.0"})
     assert_tokenized("123.456", float: {123.456, "123.456"})
@@ -86,9 +86,9 @@ defmodule StepTokenizerTest do
       word: "than",
       float: {1.1, "1.1"}
     )
+  end
 
-    # Strings with numbers
-
+  test "tokenize strings with numbers" do
     assert_tokenized("number in 'string 123'",
       word: "number",
       word: "in",

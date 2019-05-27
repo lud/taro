@@ -143,6 +143,10 @@ defmodule Taro.Tokenizer.ActionTokenizer do
 
   defdelegate reverse(val), to: :lists
 
+  # Regex must be a single token in the list
+  defp cast_tokens([{:regex, regex}]),
+    do: [{:regex, Regex.compile!(to_string(regex))}]
+
   defp cast_tokens([value | rest]),
     do: [cast_token(value) | cast_tokens(rest)]
 
@@ -159,7 +163,10 @@ defmodule Taro.Tokenizer.ActionTokenizer do
     do: {:regex, Regex.compile!(to_string(regex))}
 
   defp cast_token({:regex, regex}),
-    do: {:regex, Regex.compile!(to_string(regex))}
+    do:
+      raise("""
+      A regex must be the full value of the action step definition
+      """)
 
   defp cast_token({:accept, name}),
     do: {:accept, Macro.underscore(to_string(name))}
