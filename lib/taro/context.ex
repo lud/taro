@@ -64,10 +64,10 @@ defmodule Taro.Context do
     end
   end
 
-  def call(context, handler) do
-    %{fun: {mod, fun}, captures: captures} = handler
+  def call(context, action) do
+    %Action{mod: mod, fun: fun, args: args} = action
     sub_context = get(context, mod)
-    args = [sub_context | captures]
+    args = [sub_context | args]
     arity = length(args)
 
     case apply(mod, fun, args) do

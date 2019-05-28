@@ -1,8 +1,10 @@
 defmodule Taro.SnippetFormatter do
   alias Taro.Tokenizer.StepTokenizer
 
-  def format_snippet(step) do
-    %{keyword: keyword, table_data: table_data, doc_string: doc_string, text: text} = step
+  defguard is_kind(kind) when kind in ["Given", "When", "Then"]
+
+  def format_snippet(%{keyword: keyword} = step) when is_kind(keyword) do
+    %{table_data: table_data, doc_string: doc_string, text: text} = step
     tokens = StepTokenizer.tokenize(text)
 
     """
@@ -19,7 +21,7 @@ defmodule Taro.SnippetFormatter do
 
   defp format_tokens([{kind, {_, as_text}} | rest], index)
        when kind in [:string, :float, :integer],
-       do: [":#{kind}_#{index}" | format_tokens(rest, index + 1)]
+       do: [":#{short_type(kind)}_#{index}" | format_tokens(rest, index + 1)]
 
   defp format_tokens([{:word, word} | rest], index),
     do: ["#{word}" | format_tokens(rest, index)]
@@ -71,11 +73,15 @@ defmodule Taro.SnippetFormatter do
 
   defp extract_step_values([{kind, _} | rest], index)
        when kind in [:string, :float, :integer],
-       do: ["#{kind}_#{index}" | extract_step_values(rest, index + 1)]
+       do: ["#{short_type(kind)}_#{index}" | extract_step_values(rest, index + 1)]
 
   defp extract_step_values([_ | rest], index),
     do: extract_step_values(rest, index)
 
   defp extract_step_values([], _),
     do: []
+
+  defp short_type(:integer), do: "int"
+  defp short_type(:string), do: "str"
+  defp short_type(:float), do: "float"
 end

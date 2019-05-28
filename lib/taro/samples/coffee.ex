@@ -3,16 +3,11 @@ defmodule CoffeeMachine do
 
   def new, do: %__MODULE__{}
 
-  def to_int(n) do
-    {int, ""} = Integer.parse(n)
-    int
-  end
-
   def set_coffees(machine, n),
-    do: %__MODULE__{machine | coffees: to_int(n)}
+    do: %__MODULE__{machine | coffees: n}
 
   def insert_dollars(machine, n),
-    do: %__MODULE__{machine | dollars: machine.dollars + to_int(n)}
+    do: %__MODULE__{machine | dollars: machine.dollars + n}
 
   def press_button(%__MODULE__{coffees: coffees, dollars: dollars, served: 0} = machine)
       when dollars > 0 and coffees > 0 do
@@ -38,22 +33,22 @@ end
 defmodule Taro.Samples.Coffee do
   use Taro.Context
 
-  @step "there is a coffee machine"
-  def there_is_a_coffee_machine(context) do
+  @_Given "there is :int_0 coffee machine"
+  def given_there_is_coffee_machine(_context, int_0) do
     %{machine: CoffeeMachine.new()}
   end
 
-  @step "there are :count coffees left in the machine"
-  def there_are_n_coffees_left_in_the_machine(context, n) do
+  @_Given "there are :count coffees left in the machine"
+  def given_there_are_coffees_left_in_the_machine(%{machine: machine}, count) do
     machine =
-      context.machine
-      |> CoffeeMachine.set_coffees(n)
+      machine
+      |> CoffeeMachine.set_coffees(count)
 
     %{machine: machine}
   end
 
-  @step "I have deposited (\\d+) dollars?"
-  def i_have_deposited_n_dollars(%{machine: machine}, dollars) do
+  @_Given "I have deposited :dollars dollar"
+  def and_i_have_deposited_dollar(%{machine: machine}, dollars) do
     machine =
       machine
       |> CoffeeMachine.insert_dollars(dollars)
@@ -62,8 +57,8 @@ defmodule Taro.Samples.Coffee do
     %{machine: machine}
   end
 
-  @step "I press the coffee button"
-  def i_press_the_coffee_button(%{machine: machine}) do
+  @_When "I press the coffee button"
+  def when_i_press_the_coffee_button(%{machine: machine}) do
     machine =
       machine
       |> CoffeeMachine.press_button()
@@ -71,8 +66,8 @@ defmodule Taro.Samples.Coffee do
     %{machine: machine}
   end
 
-  @step "I should be served a coffee"
-  def i_should_be_served_a_coffee(%{machine: machine}) do
+  @_Then "I should be served a coffee"
+  def then_i_should_be_served_a_coffee(%{machine: machine}) do
     machine =
       machine
       |> CoffeeMachine.take_coffee()

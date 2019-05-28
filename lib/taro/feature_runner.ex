@@ -1,9 +1,11 @@
 defmodule Taro.FeatureRunner do
   import Ark.Wok
-  # alias Gherkin.Elements.Scenario
-  alias Taro.Context.Compiler
   alias Gherkin.Elements.Step
+  alias Taro.Context
+  alias Taro.Context.Action
+  alias Taro.Context.Compiler
   alias Taro.SnippetFormatter
+  alias Taro.Tokenizer.StepTokenizer
 
   def run_background(context, []) do
     context
@@ -25,11 +27,11 @@ defmodule Taro.FeatureRunner do
     # so we unwrap a :ok tuple but keep other values as is
     context = uok(context)
     contexts_mods = Application.get_env(:taro, :contexts)
-    handlers = Compiler.extract_actions(contexts_mods)
+    actions = Compiler.extract_actions(contexts_mods)
 
     results =
       steps
-      |> match_steps(handlers)
+      |> match_steps(actions)
       |> Enum.scan({:ok, context}, &run_step/2)
 
     results
@@ -48,23 +50,45 @@ defmodule Taro.FeatureRunner do
     List.last(results)
   end
 
-  defp match_steps(steps, handlers) do
-    {good_steps, bad_steps} =
-      steps
-      |> Enum.map(&match_step(&1, handlers))
-      |> Enum.split_with(fn
-        {:ok, _} -> true
-        {:error, _} -> false
-      end)
+  defp match_steps(steps, actions, matched \\ [], errors \\ [], true_keyword \\ "Given")
 
-    if length(bad_steps) > 0 do
-      bad_steps
+  defp match_steps([step | steps], actions, matched, errors, true_keyword) do
+    {matched, errors} =
+      case match_step(step, actions) do
+        {:ok, step_action} ->
+          {[step_action | matched], errors}
+
+        {:error, {:no_action, orphan_step}} ->
+          # Prepare a real keyword for the snippet formatter
+          orphan_step =
+            case Map.get(orphan_step, :keyword) do
+              keyword when keyword in ["Given", "When", "Then"] -> orphan_step
+              _ -> Map.put(orphan_step, :keyword, true_keyword)
+            end
+
+          {matched, [{:error, {:no_action, orphan_step}} | errors]}
+      end
+
+    true_keyword =
+      case Map.get(step, :keyword) do
+        true_kw when true_kw in ["Given", "When", "Then"] -> true_kw
+        _ -> true_keyword
+      end
+
+    match_steps(steps, actions, matched, errors, true_keyword)
+  end
+
+  defp match_steps([], actions, matched, errors, _true_keyword) do
+    {matched_steps, unmatched_steps} = {:lists.reverse(matched), :lists.reverse(errors)}
+
+    if length(unmatched_steps) > 0 do
+      unmatched_steps
       |> Enum.each(&print_unmatched_step/1)
 
       IO.puts("You can add the following snippets to any of your context modules :\n")
 
       snippets =
-        bad_steps
+        unmatched_steps
         |> Enum.map(&generate_snippet/1)
         |> Enum.join("\n")
         |> IO.puts()
@@ -74,28 +98,25 @@ defmodule Taro.FeatureRunner do
       raise "Some steps counld'nt be matched to a context function"
     end
 
-    good_steps |> Enum.map(&uok!/1)
+    matched_steps
   end
 
-  defp match_step(%Step{text: text} = step, handlers) do
-    Enum.find_value(handlers, fn handler ->
-      %{regex: regex} = handler
-      # IO.puts "does #{inspect regex} match « #{text} » ?: #{Regex.match?(regex, text)}"
-      case Regex.run(regex, text, capture: :all_but_first) do
-        nil ->
-          nil
+  defp match_step(%Step{text: text} = step, actions) do
+    tokens = StepTokenizer.tokenize(step.text)
 
-        captures ->
-          Handler.set_captures(handler, captures)
+    Enum.find_value(actions, fn action ->
+      case Action.match_step(action, step, tokens) do
+        {:error, _} -> nil
+        {:ok, args} -> Action.set_args(action, args)
       end
     end)
     |> case do
-      nil -> {:error, {:no_handler, step}}
-      handler -> {:ok, {step, handler}}
+      nil -> {:error, {:no_action, step}}
+      action -> {:ok, {step, action}}
     end
   end
 
-  defp run_step({step, handler}, previous) do
+  defp run_step({step, action}, previous) do
     {call_result, io_output} =
       case previous do
         {:ok, context} ->
@@ -104,7 +125,7 @@ defmodule Taro.FeatureRunner do
 
           captured =
             ExUnit.CaptureIO.capture_io(fn ->
-              call_result = Context.call(context, handler)
+              call_result = Context.call(context, action)
               send(parent, {ref, call_result})
             end)
 
@@ -224,11 +245,11 @@ defmodule Taro.FeatureRunner do
     ]
   end
 
-  defp print_unmatched_step({:error, {:no_handler, step}}) do
-    print_step(step, {:error, "No handler found"}, "")
+  defp print_unmatched_step({:error, {:no_action, step}}) do
+    print_step(step, {:error, "No action found"}, "")
   end
 
-  defp generate_snippet({:error, {:no_handler, step}}) do
+  defp generate_snippet({:error, {:no_action, step}}) do
     SnippetFormatter.format_snippet(step)
     |> indent_text("  ")
   end

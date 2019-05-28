@@ -2,82 +2,23 @@ defmodule StepActionMatchTest do
   use ExUnit.Case
   alias Taro.Tokenizer.StepTokenizer
   alias Taro.Tokenizer.ActionTokenizer
+  alias Taro.Context.Action
 
-  def match_tokens(step, %Regex{} = re) do
-    do_match_regex(step.source, re)
+  defp prepare_match(step_def, action_def) do
+    step = %{text: step_def}
+    action = Action.from_source({:_Given, action_def}, nil, nil)
+    {step, action}
   end
-
-  def match_tokens(step, action_tokens) do
-    do_match(step.tokens, action_tokens)
-  end
-
-  defp do_match(step_tokens, action_tokens, acc \\ [])
-
-  defp do_match([], [], acc),
-    do: {:ok, :lists.reverse(acc)}
-
-  # Match the same word
-  defp do_match([{:word, word} | step_rest], [{:word, word} | action_rest], acc),
-    do: do_match(step_rest, action_rest, acc)
-
-  # Match a choice
-  defp do_match([{:word, word} | step_rest], [{:word_choice, {word, _}} | action_rest], acc),
-    do: do_match(step_rest, action_rest, acc)
-
-  defp do_match([{:word, word} | step_rest], [{:word_choice, {_, word}} | action_rest], acc),
-    do: do_match(step_rest, action_rest, acc)
-
-  defp do_match([{:word, word} | step_rest], [{:word_choice, _} | action_rest], acc),
-    do: {:error, :word_choice}
-
-  # Match different words
-  defp do_match([{:word, _wordA} | _], [{:word, _wordB} | _], _),
-    do: {:error, :word}
-
-  # Match a number as string
-  defp do_match([{kind, {_, str}} | step_rest], [{:word, str} | action_rest], acc)
-       when kind in [:integer, :float],
-       do: do_match(step_rest, action_rest, acc)
-
-  defp do_match([{kind, {_, _}} | step_rest], [{:word, _} | action_rest], acc)
-       when kind in [:integer, :float],
-       do: {:error, {kind, :word}}
-
-  # Accept values
-
-  defp do_match([{kind, {value, _}} | step_rest], [{:accept, _} | action_rest], acc)
-       when kind in [:integer, :float],
-       do: do_match(step_rest, action_rest, [value | acc])
-
-  defp do_match([{:string, value} | step_rest], [{:accept, _} | action_rest], acc),
-    do: do_match(step_rest, action_rest, [value | acc])
-
-  # Match a regex. This is a special case, as we must rewrite the input
-
-  defp do_match_regex(step_source, regex) do
-    case Regex.run(regex, step_source, capture: :all_but_first) do
-      nil -> {:error, :regex}
-      captures -> {:ok, captures}
-    end
-  end
-
-  ## ABOVE IS IMPLEMENTATION WORKSPACE
 
   def assert_match(step_def, action_def, expected_args \\ []) do
-    step_tokens = StepTokenizer.tokenize(step_def)
-    action_tokens = ActionTokenizer.tokenize(action_def)
-    step = %{source: step_def, tokens: step_tokens}
-    assert {:ok, action_args} = match_tokens(step, action_tokens)
-    # IO.inspect({action_def, action_args}, pretty: true)
+    {step, action} = prepare_match(step_def, action_def)
+    assert {:ok, action_args} = Action.match_step(action, step)
     assert expected_args === action_args
   end
 
   def assert_not_match(step_def, action_def, reason) do
-    step_tokens = StepTokenizer.tokenize(step_def)
-    action_tokens = ActionTokenizer.tokenize(action_def)
-    step = %{source: step_def, tokens: step_tokens}
-
-    assert {:error, ^reason} = match_tokens(step, action_tokens)
+    {step, action} = prepare_match(step_def, action_def)
+    assert {:error, ^reason} = Action.match_step(action, step)
   end
 
   test "match words" do
@@ -110,6 +51,7 @@ defmodule StepActionMatchTest do
   end
 
   test "accept values" do
+    assert_match("the name is Joe", "the name is :name", ["Joe"])
     assert_match("the price is 20", "the price is :price", [20])
     assert_match("the price is 1.5", "the price is :price", [1.5])
 
