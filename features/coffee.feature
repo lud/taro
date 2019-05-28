@@ -4,7 +4,7 @@ Feature: Serve coffee
   buy coffee at all times
   
   Background:
-    Given there is a coffee machine
+    Given there is 1 coffee machine
 
   Scenario: Buy last coffee
     If there is at least one coffee in the machine,

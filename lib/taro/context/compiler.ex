@@ -1,22 +1,17 @@
 defmodule Taro.Context.Compiler do
-  # Matches words starting with a ":" at the beginning of a string
-  # or not preceded with a word
-  @re_tpl ~r/(?<!\w)(\:\w+)\b/
-  @re_captures ~r/\((?!=[?!=])/
+  alias Taro.Context.Action
 
-  alias Taro.Context.Handler
-
-  def extract_steps_handlers(modules) when is_list(modules) do
+  def extract_actions(modules) when is_list(modules) do
     modules
-    |> Enum.map(&extract_steps_handlers/1)
+    |> Enum.map(&extract_actions/1)
     |> List.flatten()
   end
 
-  def extract_steps_handlers(mod) when is_atom(mod) do
+  def extract_actions(mod) when is_atom(mod) do
     Code.ensure_loaded(mod)
 
-    if function_exported?(mod, :__taro_steps__, 0) do
-      mod.__taro_steps__()
+    if function_exported?(mod, :__taro_actions__, 0) do
+      mod.__taro_actions__()
     else
       []
     end
@@ -26,7 +21,9 @@ defmodule Taro.Context.Compiler do
     quote do
       @on_definition {unquote(__MODULE__), :on_def}
       @before_compile {unquote(__MODULE__), :before_compile}
-      Module.register_attribute(__MODULE__, :step, accumulate: true)
+      Module.register_attribute(__MODULE__, :_When, accumulate: true)
+      Module.register_attribute(__MODULE__, :_Given, accumulate: true)
+      Module.register_attribute(__MODULE__, :_Then, accumulate: true)
       Module.register_attribute(__MODULE__, :taro_steps, [])
       import ExUnit.Assertions
 
@@ -41,7 +38,7 @@ defmodule Taro.Context.Compiler do
 
       def patch_context!(_, _) do
         raise """
-        The default merge mechanism for contexts works only with maps.
+        The default merge mechanism for contexts works with maps only.
         If you need to use another data structure, you must implement
         patch_context!/2 in module #{__MODULE__}.
 
@@ -59,58 +56,80 @@ defmodule Taro.Context.Compiler do
     end
   end
 
+  def on_def(env, kind, fun_name, args, _guards, _body) do
+    module = env.module
+    action_sources = fetch_clear_action_attributes(module)
+
+    unless length(action_sources) === 0 do
+      check_def_kind(kind, env)
+
+      new_steps =
+        action_sources
+        |> Enum.map(&{Action.from_source(&1, module, fun_name), length(args)})
+
+      previous_steps = Module.get_attribute(module, :taro_steps)
+      all_steps = new_steps ++ previous_steps
+      Module.put_attribute(module, :taro_steps, all_steps)
+    end
+  end
+
+  defp fetch_clear_action_attributes(module) do
+    givens =
+      Module.get_attribute(module, :_Given)
+      |> Enum.map(&{:_Given, &1})
+
+    whens =
+      Module.get_attribute(module, :_When)
+      |> Enum.map(&{:_When, &1})
+
+    thens =
+      Module.get_attribute(module, :_Then)
+      |> Enum.map(&{:_Then, &1})
+
+    Module.delete_attribute(module, :_Given)
+    Module.delete_attribute(module, :_When)
+    Module.delete_attribute(module, :_Then)
+
+    givens ++ whens ++ thens
+  end
+
   defmacro before_compile(env) do
     module = env.module
 
-    steps_defs =
+    action_defs =
       module
       |> Module.get_attribute(:taro_steps)
-      |> Enum.map(fn {pattern, {fun, args}} ->
-        # @todo defined functions can be below, with shorter artity
-        # functions for default args, so use @todo use Module.defines?
-        defined_arity = length(args)
-        original_pattern = pattern
-        pattern = convert_tpl_matchers(pattern)
-        # make the pattern match the whole string
-        pattern = "^#{pattern}$"
-        regex = Regex.compile!(pattern)
-        captures_count = count_captures(regex)
-        # accept the context state
-        expected_arity = captures_count + 1
-
-        # If the expected arity differs from the function defined 
-        # after a step, it could be because the user set defaults
-        # args like : def there_is_coffees(count \\ 0, context).
-        # so we check if the function has been defined esewhere
-        if expected_arity != defined_arity do
-          IO.warn("""
-          The function #{module |> format_module}.#{fun}(#{format_args(args)}) 
-          defined after \"#{original_pattern}\" should accept #{expected_arity} arguments, 
-          #{defined_arity} arguments found
-          """)
-
-          if not Module.defines?(module, {fun, expected_arity}, :def) do
-            raise """
-            The function #{module |> format_module}.#{fun}(#{format_args(args)}) 
-            defined after \"#{original_pattern}\" must accept #{expected_arity} arguments, 
-            #{defined_arity} arguments found
-            """
-          end
-        end
-
-        Macro.escape(%Handler{
-          stepdef: original_pattern,
-          pattern: pattern,
-          regex: regex,
-          fun: {module, fun}
-        })
-      end)
+      |> Enum.map(&check_action_arity/1)
+      |> Enum.map(&Macro.escape/1)
 
     quote do
-      def __taro_steps__() do
-        unquote(steps_defs)
+      def __taro_actions__() do
+        unquote(action_defs)
       end
     end
+  end
+
+  def check_action_arity({action, defined_arity}) do
+    # A step attribute can be placed above a shorter function than
+    # the intended function in case multiple action source are
+    # placed above a group of clauses with different arities
+    # (actually those are different functions but we accept that)
+    unless action.is_regex do
+      # +1 because of context argument       
+      expected_arity = action.accept_count + 1
+      # @todo handle table_data/doc_string
+      if expected_arity != defined_arity do
+        if not Module.defines?(action.mod, {action.fun, expected_arity}, :def) do
+          raise """
+          Module #{format_module(action.mod)} 
+          does not define #{action.fun}/#{expected_arity}
+          after #{Action.format(action)}
+          """
+        end
+      end
+    end
+
+    action
   end
 
   @doc """
@@ -130,26 +149,15 @@ defmodule Taro.Context.Compiler do
     |> length
   end
 
-  def on_def(_env, _kind, :__taro_steps__, _args, _guards, _body),
+  defp check_def_kind(:def, env),
     do: :ok
 
-  def on_def(env, :def, fun_name, args, _guards, _body) do
-    module = env.module
-
-    new_steps =
-      module
-      |> Module.get_attribute(:step)
-      |> Enum.map(fn pattern -> {pattern, {fun_name, args}} end)
-
-    previous_steps = Module.get_attribute(module, :taro_steps)
-    all_steps = new_steps ++ previous_steps
-    Module.put_attribute(module, :taro_steps, all_steps)
-    # clear the steps for the next functions
-    Module.delete_attribute(module, :step)
-  end
-
-  def on_def(_env, _kind, _fun, _args, _guards, _body),
-    do: :ok
+  defp check_def_kind(kind, env),
+    do:
+      raise("""
+      Found attribute above #{kind}, this action can not be called
+      at #{env.file}:#{env.line}
+      """)
 
   defp format_module(mod) when is_atom(mod),
     do: format_module(to_string(mod))

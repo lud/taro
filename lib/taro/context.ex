@@ -1,18 +1,10 @@
 defmodule Taro.Context do
-  defmodule Handler do
-    defstruct stepdef: nil,
-              pattern: nil,
-              regex: nil,
-              fun: nil,
-              captures: nil
-
-    def set_captures(%__MODULE__{} = handler, captures) do
-      Map.put(handler, :captures, captures)
-    end
-  end
-
   @behaviour Access
+
+  alias Taro.Context.Action
+
   defstruct state: %{}
+
   defdelegate fetch(map, key), to: Map
   defdelegate get_and_update(map, key, fun), to: Map
   defdelegate pop(map, key), to: Map
@@ -73,7 +65,7 @@ defmodule Taro.Context do
   end
 
   def call(context, handler) do
-    %Handler{fun: {mod, fun}, captures: captures} = handler
+    %{fun: {mod, fun}, captures: captures} = handler
     sub_context = get(context, mod)
     args = [sub_context | captures]
     arity = length(args)
