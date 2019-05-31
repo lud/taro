@@ -107,7 +107,7 @@ defmodule Taro.FeatureRunner do
     Enum.find_value(actions, fn action ->
       case Action.match_step(action, step, tokens) do
         {:error, _} -> nil
-        {:ok, args} -> Action.set_args(action, args)
+        {:ok, action} -> action
       end
     end)
     |> case do
@@ -137,7 +137,7 @@ defmodule Taro.FeatureRunner do
           {:skipped, ""}
       end
 
-    print_step(step, call_result, io_output)
+    print_step(step, action, call_result, io_output)
     call_result
   end
 
@@ -154,9 +154,7 @@ defmodule Taro.FeatureRunner do
     [
       "\n",
       @feature_indent,
-      IO.ANSI.bright(),
-      "Feature: ",
-      IO.ANSI.reset(),
+      IO.ANSI.format([:bright, "Feature: "]),
       name,
       if(description == "", do: [], else: "\n"),
       indent_text(description, @feature_text_indent)
@@ -166,7 +164,7 @@ defmodule Taro.FeatureRunner do
 
   defp print_background() do
     # skip the ExUnit dot
-    ["\n", @scenario_indent, IO.ANSI.bright(), "Background:", IO.ANSI.reset()]
+    ["\n", @scenario_indent, IO.ANSI.format([:bright, "Background:"])]
     |> output_print
   end
 
@@ -175,9 +173,7 @@ defmodule Taro.FeatureRunner do
     [
       "\n",
       @scenario_indent,
-      IO.ANSI.bright(),
-      "Scenario: ",
-      IO.ANSI.reset(),
+      IO.ANSI.format([:bright, "Scenario: "]),
       scenario.name,
       if(scenario.description == "",
         do: [],
@@ -187,37 +183,41 @@ defmodule Taro.FeatureRunner do
     |> output_print
   end
 
-  defp print_step(step, result, step_io_output) do
+  defp print_step(step, action, result, step_io_output) do
+    color = step_print_color(result)
+
     [
       @step_indent,
-      step_print_color(result),
-      IO.ANSI.bright(),
-      step.keyword,
-      IO.ANSI.reset(),
-      step_print_color(result),
+      IO.ANSI.format([color, :bright, step.keyword]),
       " ",
-      step.text,
-      step_print_extra(result),
-      IO.ANSI.reset(),
+      IO.ANSI.format([
+        color,
+        bright_args(action.print_tokens, color) |> Enum.intersperse(" "),
+        step_print_extra(result)
+      ]),
       if(step_io_output != "", do: ["\n", step_print_io(step_io_output)], else: [])
     ]
     |> output_print
   end
 
+  defp bright_args([{:text, text} | rest], color),
+    do: [IO.ANSI.format([color, text]) | bright_args(rest, color)]
+
+  defp bright_args([{:arg, value} | rest], color),
+    do: [IO.ANSI.format([color, :bright, to_string(value)]) | bright_args(rest, color)]
+
+  defp bright_args([], _), do: []
+
   defp output_print(iolist) do
-    [iolist, IO.ANSI.reset()]
+    iolist
     |> IO.puts()
   end
 
-  defp step_print_color({:ok, context}), do: IO.ANSI.green()
-
-  defp step_print_color({:error, {:exception, e, stack}}), do: IO.ANSI.red()
-
-  defp step_print_color({:error, reason}), do: IO.ANSI.red()
-
-  defp step_print_color(:pending), do: IO.ANSI.yellow()
-
-  defp step_print_color(:skipped), do: IO.ANSI.cyan()
+  defp step_print_color({:ok, context}), do: :green
+  defp step_print_color({:error, {:exception, e, stack}}), do: :red
+  defp step_print_color({:error, reason}), do: :red
+  defp step_print_color(:pending), do: :yellow
+  defp step_print_color(:skipped), do: :cyan
 
   defp step_print_extra({:ok, context}) do
     []
@@ -246,7 +246,7 @@ defmodule Taro.FeatureRunner do
   end
 
   defp print_unmatched_step({:error, {:no_action, step}}) do
-    print_step(step, {:error, "No action found"}, "")
+    print_step(step, :no_action, {:error, "No action found"}, "")
   end
 
   defp generate_snippet({:error, {:no_action, step}}) do

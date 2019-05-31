@@ -33,8 +33,8 @@ end
 defmodule Taro.Samples.Coffee do
   use Taro.Context
 
-  @_Given "there is a coffee machine"
-  def given_there_is_coffee_machine(_context) do
+  @_Given ~r/there is a coffee (machine)/
+  def given_there_is_coffee_machine(_context, "machine") do
     %{machine: CoffeeMachine.new()}
   end
 
