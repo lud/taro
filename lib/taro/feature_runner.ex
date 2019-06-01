@@ -7,6 +7,14 @@ defmodule Taro.FeatureRunner do
   alias Taro.SnippetFormatter
   alias Taro.Tokenizer.StepTokenizer
 
+  @feature_indent ""
+  @feature_text_indent @feature_indent <> "  "
+  @scenario_indent "  "
+  @scenario_text_indent @scenario_indent <> "  "
+  @step_indent "    "
+  @error_indent @step_indent <> "  "
+  @step_io_indent @step_indent <> " │ "
+
   def run_background(context, []) do
     context
   end
@@ -85,13 +93,16 @@ defmodule Taro.FeatureRunner do
       unmatched_steps
       |> Enum.each(&print_unmatched_step/1)
 
-      IO.puts("You can add the following snippets to any of your context modules :\n")
-
       snippets =
         unmatched_steps
         |> Enum.map(&generate_snippet/1)
         |> Enum.join("\n")
-        |> IO.puts()
+
+      err_text =
+        "\nYou can add the following snippet#{if(length(unmatched_steps) > 1, do: "s", else: "")} to any of your context modules :\n\n" <>
+          snippets
+
+      IO.puts(IO.ANSI.format([:light_yellow, err_text]))
 
       # await IO output
       Process.sleep(100)
@@ -141,14 +152,6 @@ defmodule Taro.FeatureRunner do
     call_result
   end
 
-  @feature_indent ""
-  @feature_text_indent @feature_indent <> "  "
-  @scenario_indent "  "
-  @scenario_text_indent @scenario_indent <> "  "
-  @step_indent "    "
-  @error_indent @step_indent <> "  "
-  @step_io_indent @step_indent <> " │ "
-
   def print_feature(%{name: name, description: description}) do
     # skip the ExUnit dot
     [
@@ -186,15 +189,18 @@ defmodule Taro.FeatureRunner do
   defp print_step(step, action, result, step_io_output) do
     color = step_print_color(result)
 
+    text =
+      case action do
+        :no_action -> IO.ANSI.format([color, step.text])
+        action -> bright_args(action.print_tokens, color) |> Enum.intersperse(" ")
+      end
+
     [
       @step_indent,
       IO.ANSI.format([color, :bright, step.keyword]),
       " ",
-      IO.ANSI.format([
-        color,
-        bright_args(action.print_tokens, color) |> Enum.intersperse(" "),
-        step_print_extra(result)
-      ]),
+      text,
+      IO.ANSI.format([color, step_print_extra(result)]),
       if(step_io_output != "", do: ["\n", step_print_io(step_io_output)], else: [])
     ]
     |> output_print
@@ -254,7 +260,7 @@ defmodule Taro.FeatureRunner do
     |> indent_text("  ")
   end
 
-  defp indent_text(string, ws) do
+  defp indent_text(string, ws) when is_binary(string) and is_binary(ws) do
     ws <>
       (string
        |> String.trim_trailing("\n")
