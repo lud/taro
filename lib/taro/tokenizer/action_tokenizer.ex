@@ -16,8 +16,6 @@ defmodule Taro.Tokenizer.ActionTokenizer do
                   (char >= ?A and char <= ?Z) or
                   char === ?_
 
-  defguard is_number
-
   def tokenize(string) when is_binary(string) do
     string
     |> String.to_charlist()

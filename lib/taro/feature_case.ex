@@ -1,5 +1,6 @@
 defmodule Taro.FeatureCase do
   alias Gherkin.Elements.Feature
+
   # alias Gherkin.Elements.Scenario
   # alias Gherkin.Elements.Step
   # alias Taro.Context
@@ -45,8 +46,8 @@ defmodule Taro.FeatureCase do
 
   defp build_scenario_setup(background_steps) do
     # We map on the :taro_test === true to run the setup.
-    # This prevents from running the setup for tests defined in
-    # The feature .exs file
+    # This prevents from running the setup for classic tests defined
+    # in the .exs file using the feature
     quote location: :keep do
       ExUnit.Callbacks.setup exunit_context do
         case Map.fetch(exunit_context, :taro_test) do
