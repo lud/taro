@@ -23,8 +23,6 @@ defmodule Taro.Feature do
     quoted_scenaro_tests = build_scenario_tests(scenarios)
 
     quote location: :keep do
-      use ExUnit.Case
-
       unquote(quoted_setup)
       unquote(quoted_scenario_setup)
       unquote(quoted_scenaro_tests)
