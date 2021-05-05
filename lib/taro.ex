@@ -5,6 +5,4 @@ defmodule Taro do
       other -> other
     end
   end
-
-  def hello, do: :world
 end

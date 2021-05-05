@@ -1,6 +1,9 @@
 defmodule Taro.Taro.Coffee.FeatureTest do
-  use Taro.FeatureCase, file: "features/coffee.feature"
+  use Taro.Feature,
+    file: "features/coffee.feature",
+    contexts: [
+      __MODULE__
+    ]
 
-  test "i have a feature" do
-  end
+  use Taro.Context
 end

@@ -9,14 +9,16 @@ defmodule Taro.Context do
   defdelegate get_and_update(map, key, fun), to: Map
   defdelegate pop(map, key), to: Map
 
+  @callback new_context() :: term
+
   defmacro __using__(opts) do
     Taro.Context.Compiler.install(opts)
   end
 
-  @doc """
-  We will build a map where each passed module is a key and the
-  value is the result of module.setup()
-  """
+  # We will build a map where each passed module is a key and the
+  # value is the result of module.setup()
+  ""
+
   def new(modules) do
     mod_states =
       modules
@@ -45,7 +47,7 @@ defmodule Taro.Context do
   end
 
   defp init_context_module(mod) do
-    case mod.setup() do
+    case mod.new_context() do
       data when is_map(data) ->
         data
 
@@ -115,9 +117,9 @@ defmodule Taro.Context do
       Accepted values:
         - {:ok, patch}         (will be merged in context)
         - map when is_map(map) (will be merged in context)
-        - :ok        
+        - :ok
         - {:error, reason}
-        - anything else except the forbidden values. In this case, 
+        - anything else except the forbidden values. In this case,
           the returned value will be discarded
       """
   end

@@ -7,13 +7,13 @@ defmodule Taro.FeatureRunner do
   alias Taro.SnippetFormatter
   alias Taro.Tokenizer.StepTokenizer
 
-  @feature_indent ""
-  @feature_text_indent @feature_indent <> "  "
-  @scenario_indent "  "
-  @scenario_text_indent @scenario_indent <> "  "
-  @step_indent "    "
-  @error_indent @step_indent <> "  "
-  @step_io_indent @step_indent <> " │ "
+  @indent_feat__ "  "
+  @indent_feat_t "    "
+  @indent_scen__ "    "
+  @indent_scen_t "      "
+  @indent_step_t "         "
+  @indent_err__t "           "
+  @indent_io___t "         │ "
 
   def run_background(context, []) do
     context
@@ -29,12 +29,13 @@ defmodule Taro.FeatureRunner do
     run_steps(context, scenario.steps)
   end
 
-  def run_steps(context, steps) do
+  defp run_steps(context, steps) do
     # If there was a Background in the feature, the setup will
     # return {:ok, context} | :pending | {:error, …}
     # so we unwrap a :ok tuple but keep other values as is
     context = uok(context)
     contexts_mods = Application.get_env(:taro, :contexts)
+
     actions = Compiler.extract_actions(contexts_mods)
 
     results =
@@ -96,13 +97,32 @@ defmodule Taro.FeatureRunner do
       snippets =
         unmatched_steps
         |> Enum.map(&generate_snippet/1)
+        |> Enum.join("\n\n")
+
+      contexts_mods =
+        actions
+        |> Enum.map(& &1.mod)
+        |> Enum.uniq()
+
+      contexts_mods_list =
+        contexts_mods
+        |> Enum.map(&("- " <> to_string(&1)))
         |> Enum.join("\n")
 
-      err_text =
-        "\nYou can add the following snippet#{if(length(unmatched_steps) > 1, do: "s", else: "")} to any of your context modules :\n\n" <>
-          snippets
+      err_text = """
 
-      IO.puts(IO.ANSI.format([:light_yellow, err_text]))
+        Some steps could not be matched to an action within any of the context
+        modules used.
+
+        Context Modules:
+        #{contexts_mods_list}
+
+        You can add the following snippet#{if(length(unmatched_steps) > 1, do: "s", else: "")} to any of those modules modules.
+
+      #{snippets}
+      """
+
+      IO.puts(IO.ANSI.format([:yellow, err_text]))
 
       # await IO output
       Process.sleep(100)
@@ -112,7 +132,7 @@ defmodule Taro.FeatureRunner do
     matched_steps
   end
 
-  defp match_step(%Step{text: text} = step, actions) do
+  defp match_step(%{keyword: step_type, text: text} = step, actions) do
     tokens = StepTokenizer.tokenize(step.text)
 
     Enum.find_value(actions, fn action ->
@@ -156,18 +176,18 @@ defmodule Taro.FeatureRunner do
     # skip the ExUnit dot
     [
       "\n",
-      @feature_indent,
+      @indent_feat__,
       IO.ANSI.format([:bright, "Feature: "]),
       name,
       if(description == "", do: [], else: "\n"),
-      indent_text(description, @feature_text_indent)
+      indent_text(description, @indent_feat_t)
     ]
     |> output_print()
   end
 
   defp print_background() do
     # skip the ExUnit dot
-    ["\n", @scenario_indent, IO.ANSI.format([:bright, "Background:"])]
+    ["\n", @indent_scen__, IO.ANSI.format([:bright, "Background:"])]
     |> output_print
   end
 
@@ -175,13 +195,9 @@ defmodule Taro.FeatureRunner do
     # skip the ExUnit dot
     [
       "\n",
-      @scenario_indent,
+      @indent_scen__,
       IO.ANSI.format([:bright, "Scenario: "]),
-      scenario.name,
-      if(scenario.description == "",
-        do: [],
-        else: ["\n", indent_text(scenario.description, @scenario_text_indent)]
-      )
+      scenario.name
     ]
     |> output_print
   end
@@ -196,8 +212,8 @@ defmodule Taro.FeatureRunner do
       end
 
     [
-      @step_indent,
-      IO.ANSI.format([color, :bright, step.keyword]),
+      @indent_step_t,
+      step.keyword,
       " ",
       text,
       IO.ANSI.format([color, step_print_extra(result)]),
@@ -210,13 +226,12 @@ defmodule Taro.FeatureRunner do
     do: [IO.ANSI.format([color, text]) | bright_args(rest, color)]
 
   defp bright_args([{:arg, value} | rest], color),
-    do: [IO.ANSI.format([color, :bright, to_string(value)]) | bright_args(rest, color)]
+    do: [IO.ANSI.format([:bright, to_string(value)]) | bright_args(rest, color)]
 
   defp bright_args([], _), do: []
 
   defp output_print(iolist) do
-    iolist
-    |> IO.puts()
+    IO.puts(iolist)
   end
 
   defp step_print_color({:ok, context}), do: :green
@@ -230,11 +245,11 @@ defmodule Taro.FeatureRunner do
   end
 
   defp step_print_extra({:error, {:exception, e, stack}}) do
-    ["\n", @error_indent, "Exception: ", Exception.message(e)]
+    ["\n", @indent_err__t, "Exception: ", Exception.message(e)]
   end
 
   defp step_print_extra({:error, reason}) do
-    ["\n", @error_indent, "Error: ", inspect(reason)]
+    ["\n", @indent_err__t, "Error: ", inspect(reason)]
   end
 
   defp step_print_extra(:pending) do
@@ -247,7 +262,7 @@ defmodule Taro.FeatureRunner do
 
   defp step_print_io(captured) do
     [
-      String.trim_trailing(indent_text(captured, @step_io_indent), "\n")
+      String.trim_trailing(indent_text(captured, @indent_io___t), "\n")
     ]
   end
 

@@ -28,11 +28,12 @@ defmodule Taro.Context.Action do
       tokens: tokens,
       mod: mod,
       fun: fun,
+      kind: kind,
       accept_count: count_accepts(tokens)
     }
   end
 
-  # match_step/2 is for test purpose, step tokens should be computed 
+  # match_step/2 is for test purpose, step tokens should be computed
   # only once, not for every action
   def match_step(%__MODULE__{} = this, step) do
     step_tokens = StepTokenizer.tokenize(step.text)
@@ -40,7 +41,7 @@ defmodule Taro.Context.Action do
   end
 
   @doc """
-  Returns the result of the match : a list of tokens with either 
+  Returns the result of the match : a list of tokens with either
   {:text, text} or {:arg, arg} in order to ease printing out args
   in the console.
 
@@ -125,22 +126,17 @@ defmodule Taro.Context.Action do
   # Match a regex. This is a special case, as we must rewrite the input
 
   defp do_match_regex(regex, step_text) do
-    IO.puts("step text #{step_text}")
-
     case Regex.run(regex, step_text, capture: :all_but_first, return: :index) do
       nil ->
         {:error, :regex}
 
       capture_indexes ->
-        IO.puts("step text 2 #{step_text}")
         match_result = regex_indexes_to_match_result(capture_indexes, step_text)
         {:ok, match_result}
     end
   end
 
   defp regex_indexes_to_match_result(capture_indexes, step_text) do
-    IO.puts("overlap ?  #{regex_indexes_overlap?(capture_indexes)}")
-
     if regex_indexes_overlap?(capture_indexes) do
       # @todo enhance printout
       # arg will be a single list

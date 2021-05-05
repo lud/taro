@@ -19,6 +19,8 @@ defmodule Taro.Context.Compiler do
 
   def install(_opts) do
     quote do
+      @behaviour Taro.Context
+
       @on_definition {unquote(__MODULE__), :on_def}
       @before_compile {unquote(__MODULE__), :before_compile}
       Module.register_attribute(__MODULE__, :_When, accumulate: true)
@@ -29,7 +31,7 @@ defmodule Taro.Context.Compiler do
 
       @taro_steps []
 
-      def setup(),
+      def new_context(),
         do: {:ok, %{}}
 
       def patch_context!(context, patch) when is_map(context) and is_map(patch) do
@@ -51,7 +53,7 @@ defmodule Taro.Context.Compiler do
       def transform!(value),
         do: value
 
-      defoverridable setup: 0,
+      defoverridable new_context: 0,
                      patch_context!: 2
     end
   end
@@ -115,15 +117,19 @@ defmodule Taro.Context.Compiler do
     # placed above a group of clauses with different arities
     # (actually those are different functions but we accept that)
     unless action.is_regex do
-      # +1 because of context argument       
+      # +1 because of context argument
       expected_arity = action.accept_count + 1
       # @todo handle table_data/doc_string
       if expected_arity != defined_arity do
         if not Module.defines?(action.mod, {action.fun, expected_arity}, :def) do
           raise """
-          Module #{format_module(action.mod)} 
-          does not define #{action.fun}/#{expected_arity}
-          after #{Action.format(action)}
+          context module #{action.mod} does not export the function matching the action
+
+              The function defined after:
+
+                #{Action.format(action)}
+
+              should have an arity of #{expected_arity}
           """
         end
       end
@@ -135,9 +141,10 @@ defmodule Taro.Context.Compiler do
   @doc """
   Replaces ":vars in pattern" to "(.+) in pattern"
   """
-  def convert_tpl_matchers(pattern) do
-    Regex.replace(@re_tpl, pattern, "(.+)")
-  end
+
+  # def convert_tpl_matchers(pattern) do
+  #   Regex.replace(@re_tpl, pattern, "(.+)")
+  # end
 
   defp count_captures(regex) do
     pattern =
