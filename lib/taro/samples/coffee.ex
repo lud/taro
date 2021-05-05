@@ -16,8 +16,6 @@ defmodule CoffeeMachine do
         %__MODULE__{coffees: coffees, dollars: dollars, served: 0, price: price} = machine
       )
       when dollars >= price and coffees > 0 do
-    dollars |> IO.inspect(label: "dollars")
-    price |> IO.inspect(label: "price")
     %__MODULE__{machine | coffees: coffees - 1, dollars: dollars - 1, served: 1}
   end
 

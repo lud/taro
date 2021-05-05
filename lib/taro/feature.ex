@@ -35,8 +35,6 @@ defmodule Taro.Feature do
         opts
 
       {:ok, other} ->
-        env |> IO.inspect(label: "env")
-
         raise ArgumentError,
           message: """
           invalid option :file given to `use Taro.Feature` in #{env.file}
@@ -91,7 +89,6 @@ defmodule Taro.Feature do
 
   defp parse_feature(opts) do
     Gherkin.Parser.parse_feature(opts[:source], opts[:file])
-    |> IO.inspect(label: "tree")
     |> Map.update!(:background_steps, &cast_steps/1)
     |> Map.update!(:scenarios, fn scenarios ->
       Enum.map(scenarios, fn scenario ->

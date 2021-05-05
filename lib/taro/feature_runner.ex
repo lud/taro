@@ -208,7 +208,7 @@ defmodule Taro.FeatureRunner do
     text =
       case action do
         :no_action -> IO.ANSI.format([color, step.text])
-        action -> bright_args(action.print_tokens, color) |> Enum.intersperse(" ")
+        action -> action.print_tokens |> bright_args(color) |> Enum.intersperse(" ")
       end
 
     [
