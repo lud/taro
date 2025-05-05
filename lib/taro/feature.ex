@@ -1,12 +1,6 @@
 defmodule Taro.Feature do
   alias Gherkin.Elements.Feature
 
-  defp ensure_started() do
-    if not Process.whereis(Taro.Supervisor) do
-      raise "cannot use Taro.Feature without starting the Taro application, " <>
-              "please call Taro.start() from your test or from test_helper.exs"
-    end
-  end
 
   defmacro __using__(opts) do
     opts =

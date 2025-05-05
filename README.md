@@ -10,7 +10,7 @@ by adding `taro` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:taro, "~> 0.1.0"}
+    {:taro, "~> 0.1.0", only: [:test]}
   ]
 end
 ```
