@@ -62,7 +62,7 @@ defmodule Taro.Context.Compiler do
     module = env.module
     action_sources = fetch_clear_action_attributes(module)
 
-    unless length(action_sources) === 0 do
+    if length(action_sources) != 0 do
       check_def_kind(kind, env)
 
       new_steps =
@@ -116,7 +116,7 @@ defmodule Taro.Context.Compiler do
     # the intended function in case multiple action source are
     # placed above a group of clauses with different arities
     # (actually those are different functions but we accept that)
-    unless action.is_regex do
+    if not action.is_regex do
       # +1 because of context argument
       expected_arity = action.accept_count + 1
       # @todo handle table_data/doc_string

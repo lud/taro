@@ -2,7 +2,7 @@ defmodule Taro.Feature do
   alias Gherkin.Elements.Feature
 
   defp ensure_started() do
-    unless Process.whereis(Taro.Supervisor) do
+    if not Process.whereis(Taro.Supervisor) do
       raise "cannot use Taro.Feature without starting the Taro application, " <>
               "please call Taro.start() from your test or from test_helper.exs"
     end
